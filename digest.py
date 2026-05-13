@@ -5,6 +5,9 @@ Fetches RSS feeds, scores relevance via Claude API, and sends a daily email dige
 """
 
 import os
+import re
+import ssl
+import html
 import json
 import smtplib
 import feedparser
@@ -15,13 +18,15 @@ from anthropic import Anthropic
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 
-RECIPIENT_EMAIL = os.environ["DIGEST_RECIPIENT_EMAIL"]
-SENDER_EMAIL    = os.environ["DIGEST_SENDER_EMAIL"]
-SMTP_HOST       = os.environ["SMTP_HOST"]           # e.g. smtp.gmail.com
-SMTP_PORT       = int(os.environ.get("SMTP_PORT", "587"))
-SMTP_USER       = os.environ["SMTP_USER"]
-SMTP_PASSWORD   = os.environ["SMTP_PASSWORD"]
-ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
+RECIPIENT_EMAIL   = os.environ.get("DIGEST_RECIPIENT_EMAIL", "")
+SENDER_EMAIL      = os.environ.get("DIGEST_SENDER_EMAIL", "")
+SMTP_HOST         = os.environ.get("SMTP_HOST", "")
+SMTP_PORT         = int(os.environ.get("SMTP_PORT", "587"))
+SMTP_USER         = os.environ.get("SMTP_USER", "")
+SMTP_PASSWORD     = os.environ.get("SMTP_PASSWORD", "")
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+
+MODEL = "claude-sonnet-4-5"
 
 # How many hours back to look for new items (24 = daily)
 LOOKBACK_HOURS = 24
@@ -82,6 +87,13 @@ is more valuable than deep technical tutorials.
 
 # ── Feed fetching ──────────────────────────────────────────────────────────────
 
+def _parse_date(entry) -> datetime | None:
+    if hasattr(entry, "published_parsed") and entry.published_parsed:
+        return datetime(*entry.published_parsed[:6], tzinfo=timezone.utc)
+    if hasattr(entry, "updated_parsed") and entry.updated_parsed:
+        return datetime(*entry.updated_parsed[:6], tzinfo=timezone.utc)
+    return None
+
 def fetch_recent_items(feeds: list[dict], lookback_hours: int) -> tuple[list[dict], list[dict]]:
     """Fetch RSS feed items published within the lookback window.
     Returns (items, feed_warnings) where feed_warnings is a list of dicts
@@ -113,11 +125,7 @@ def fetch_recent_items(feeds: list[dict], lookback_hours: int) -> tuple[list[dic
             # Check for stale feed — look at most recent entry date
             most_recent = None
             for entry in parsed.entries:
-                pub = None
-                if hasattr(entry, "published_parsed") and entry.published_parsed:
-                    pub = datetime(*entry.published_parsed[:6], tzinfo=timezone.utc)
-                elif hasattr(entry, "updated_parsed") and entry.updated_parsed:
-                    pub = datetime(*entry.updated_parsed[:6], tzinfo=timezone.utc)
+                pub = _parse_date(entry)
                 if pub and (most_recent is None or pub > most_recent):
                     most_recent = pub
 
@@ -130,16 +138,11 @@ def fetch_recent_items(feeds: list[dict], lookback_hours: int) -> tuple[list[dic
 
             # Normal item collection
             for entry in parsed.entries:
-                published = None
-                if hasattr(entry, "published_parsed") and entry.published_parsed:
-                    published = datetime(*entry.published_parsed[:6], tzinfo=timezone.utc)
-                elif hasattr(entry, "updated_parsed") and entry.updated_parsed:
-                    published = datetime(*entry.updated_parsed[:6], tzinfo=timezone.utc)
+                published = _parse_date(entry)
 
                 if published is None or published >= cutoff:
                     summary = ""
                     if hasattr(entry, "summary"):
-                        import re
                         summary = re.sub(r"<[^>]+>", "", entry.summary)[:500]
 
                     items.append({
@@ -162,13 +165,10 @@ def fetch_recent_items(feeds: list[dict], lookback_hours: int) -> tuple[list[dic
 
 # ── AI relevance scoring ───────────────────────────────────────────────────────
 
-def score_and_annotate(items: list[dict], client: Anthropic) -> list[dict]:
-    """
-    Send all items to Claude in a single batch call.
-    Returns items with added 'score' (1-10) and 'editorial_note' fields.
-    """
+def score_and_annotate(items: list[dict], client: Anthropic) -> None:
+    """Mutates items in place, adding 'score' (1-10) and 'editorial_note' fields."""
     if not items:
-        return []
+        return
 
     items_payload = json.dumps([
         {"id": i, "title": item["title"], "summary": item["summary"], "domain": item["domain"]}
@@ -199,7 +199,7 @@ Articles to evaluate:
 Respond with ONLY the JSON array, no preamble or markdown fences."""
 
     response = client.messages.create(
-        model="claude-sonnet-4-5",
+        model=MODEL,
         max_tokens=4000,
         messages=[{"role": "user", "content": prompt}]
     )
@@ -226,8 +226,6 @@ Respond with ONLY the JSON array, no preamble or markdown fences."""
         for item in items:
             item["score"] = 5
             item["editorial_note"] = ""
-
-    return items
 
 # ── Email rendering ────────────────────────────────────────────────────────────
 
@@ -259,14 +257,22 @@ def render_email(items: list[dict], feed_warnings: list[dict]) -> tuple[str, str
         items_html = ""
         for item in domain_items:
             score_color = "#00875a" if item["score"] >= 8 else "#ff7452" if item["score"] >= 6 else "#6b778c"
+            safe_url = item["url"] if re.match(r"^https?://", item.get("url", "")) else "#"
+            href = html.escape(safe_url)
+            title = html.escape(item["title"])
+            source = html.escape(item["source"])
+            published = html.escape(item["published"])
+            note = html.escape(item.get("editorial_note", ""))
+            vendor_badge = ' · <span style="color:#ff7452;font-weight:600;">vendor source</span>' if item.get("vendor") else ""
+            note_html = f'<div style="margin-top:8px;font-size:13px;color:#42526e;line-height:1.5;background:#f8f9fa;border-left:3px solid {color};padding:6px 10px;border-radius:0 3px 3px 0;">{note}</div>' if note else ""
             items_html += f"""
             <tr>
               <td style="padding:14px 0;border-bottom:1px solid #f0f0f0;">
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
                   <div style="flex:1;">
-                    <a href="{item['url']}" style="font-size:14px;font-weight:600;color:#172b4d;text-decoration:none;line-height:1.4;">{item['title']}</a>
-                    <div style="margin-top:4px;font-size:11px;color:#6b778c;">{item['source']} · {item['published']}{' · <span style="color:#ff7452;font-weight:600;">vendor source</span>' if item.get('vendor') else ''}</div>
-                    {f'<div style="margin-top:8px;font-size:13px;color:#42526e;line-height:1.5;background:#f8f9fa;border-left:3px solid {color};padding:6px 10px;border-radius:0 3px 3px 0;">{item["editorial_note"]}</div>' if item.get("editorial_note") else ""}
+                    <a href="{href}" style="font-size:14px;font-weight:600;color:#172b4d;text-decoration:none;line-height:1.4;">{title}</a>
+                    <div style="margin-top:4px;font-size:11px;color:#6b778c;">{source} · {published}{vendor_badge}</div>
+                    {note_html}
                   </div>
                   <div style="flex-shrink:0;min-width:28px;height:28px;padding:0 6px;border-radius:14px;background:{score_color};color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;text-align:center;line-height:28px;">{item['score']}</div>
                 </div>
@@ -276,7 +282,7 @@ def render_email(items: list[dict], feed_warnings: list[dict]) -> tuple[str, str
         sections_html += f"""
         <tr>
           <td style="padding:24px 0 0;">
-            <div style="display:inline-block;background:{color};color:#fff;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;padding:4px 10px;border-radius:3px;margin-bottom:4px;">{domain}</div>
+            <div style="display:inline-block;background:{color};color:#fff;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;padding:4px 10px;border-radius:3px;margin-bottom:4px;">{html.escape(domain)}</div>
             <table width="100%" cellpadding="0" cellspacing="0" border="0">
               {items_html}
             </table>
@@ -286,7 +292,7 @@ def render_email(items: list[dict], feed_warnings: list[dict]) -> tuple[str, str
     warnings_html = ""
     if feed_warnings:
         warning_rows = "".join(
-            f'<tr><td style="padding:3px 0;font-size:11px;color:#6b778c;">⚠️ <strong>{w["source"]}</strong> — {w["reason"]}</td></tr>'
+            f'<tr><td style="padding:3px 0;font-size:11px;color:#6b778c;">⚠️ <strong>{html.escape(w["source"])}</strong> — {html.escape(w["reason"])}</td></tr>'
             for w in feed_warnings
         )
         warnings_html = f"""
@@ -299,7 +305,7 @@ def render_email(items: list[dict], feed_warnings: list[dict]) -> tuple[str, str
           </td>
         </tr>"""
 
-    html = f"""<!DOCTYPE html>
+    html_body = f"""<!DOCTYPE html>
 <html>
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
 <body style="margin:0;padding:0;background:#f4f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;">
@@ -343,7 +349,7 @@ def render_email(items: list[dict], feed_warnings: list[dict]) -> tuple[str, str
 </html>"""
 
     subject = f"📊 Davely Digest — {today} ({count} items)"
-    return subject, html
+    return subject, html_body
 
 # ── Email sending ──────────────────────────────────────────────────────────────
 
@@ -356,7 +362,7 @@ def send_email(subject: str, html_body: str):
 
     with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
         server.ehlo()
-        server.starttls()
+        server.starttls(context=ssl.create_default_context())
         server.login(SMTP_USER, SMTP_PASSWORD)
         server.sendmail(SENDER_EMAIL, RECIPIENT_EMAIL, msg.as_string())
 
@@ -365,6 +371,17 @@ def send_email(subject: str, html_body: str):
 # ── Main ───────────────────────────────────────────────────────────────────────
 
 def main():
+    missing = [k for k, v in {
+        "DIGEST_RECIPIENT_EMAIL": RECIPIENT_EMAIL,
+        "DIGEST_SENDER_EMAIL": SENDER_EMAIL,
+        "SMTP_HOST": SMTP_HOST,
+        "SMTP_USER": SMTP_USER,
+        "SMTP_PASSWORD": SMTP_PASSWORD,
+        "ANTHROPIC_API_KEY": ANTHROPIC_API_KEY,
+    }.items() if not v]
+    if missing:
+        raise RuntimeError(f"Missing required environment variables: {', '.join(missing)}")
+
     print(f"🔍 Fetching feeds (last {LOOKBACK_HOURS}h)...")
     items, feed_warnings = fetch_recent_items(FEEDS, LOOKBACK_HOURS)
     print(f"   Found {len(items)} raw items")
@@ -379,7 +396,7 @@ def main():
 
     print("🤖 Scoring and annotating with Claude...")
     client = Anthropic(api_key=ANTHROPIC_API_KEY)
-    items = score_and_annotate(items, client)
+    score_and_annotate(items, client)
 
     # Filter to relevant items
     relevant = [i for i in items if i.get("score", 0) >= MIN_SCORE]
