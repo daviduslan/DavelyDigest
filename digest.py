@@ -47,24 +47,27 @@ FEEDS = [
     {"url": "https://www.getdbt.com/blog/rss.xml",                      "domain": "Data Engineering",   "source": "dbt Blog",                    "vendor": False},
 
     # Data Governance
+    {"url": "https://metadataweekly.substack.com/feed",                 "domain": "Data Governance",    "source": "Context & Chaos",             "vendor": True},
+    {"url": "https://www.montecarlodata.com/feed/",                     "domain": "Data Governance",    "source": "Monte Carlo Data",            "vendor": True},
 
     # Analytics & BI
     {"url": "https://locallyoptimistic.com/feed/",                      "domain": "Analytics & BI",     "source": "Locally Optimistic",          "vendor": False},
-    {"url": "https://medium.com/feed/towards-data-science",             "domain": "Analytics & BI",     "source": "Towards Data Science",        "vendor": False},
 
     # Data Science & ML
     {"url": "https://eugeneyan.com/rss/",                               "domain": "Data Science & ML",  "source": "Eugene Yan",                  "vendor": False},
-    {"url": "https://huyenchip.com/feed.xml",                           "domain": "Data Science & ML",  "source": "Chip Huyen",                  "vendor": False},
+    {"url": "https://vickiboykis.com/index.xml",                        "domain": "Data Science & ML",  "source": "Vicki Boykis",                "vendor": False},
 
     # AI & Data Leadership Intersection
     {"url": "https://thesequence.substack.com/feed",                    "domain": "AI & Data",          "source": "The Sequence",                "vendor": False},
     {"url": "https://importai.substack.com/feed",                       "domain": "AI & Data",          "source": "Import AI",                   "vendor": False},
     {"url": "https://magazine.sebastianraschka.com/feed",               "domain": "AI & Data",          "source": "Ahead of AI",                 "vendor": False},
     {"url": "https://gradientflow.com/blog/feed/",                      "domain": "AI & Data",          "source": "Gradient Flow",               "vendor": False},
+    {"url": "https://www.oneusefulthing.org/feed",                      "domain": "AI & Data",          "source": "One Useful Thing",            "vendor": False},
 
     # Data Leadership & Strategy
     {"url": "https://benn.substack.com/feed",                           "domain": "Data Leadership",    "source": "Benn Stancil",                "vendor": False},
     {"url": "https://www.oreilly.com/radar/topics/data/feed/index.xml", "domain": "Data Leadership",    "source": "O'Reilly Radar",              "vendor": False},
+    {"url": "https://sloanreview.mit.edu/feed/",                        "domain": "Data Leadership",    "source": "MIT Sloan Review",            "vendor": False},
 ]
 
 # ── Learning plan context (used in the Claude prompt) ─────────────────────────
@@ -298,7 +301,7 @@ def render_email(items: list[dict], feed_warnings: list[dict]) -> tuple[str, str
                     <div style="margin-top:4px;font-size:11px;color:#6b778c;">{source} · {published}{vendor_badge}</div>
                     {note_html}
                   </div>
-                  <div style="flex-shrink:0;min-width:28px;height:28px;padding:0 6px;border-radius:14px;background:{score_color};color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;text-align:center;line-height:28px;">{item['score']}</div>
+                  <table cellpadding="0" cellspacing="0" border="0" style="flex-shrink:0;"><tr><td style="background:{score_color};border-radius:12px;padding:4px 9px;font-size:12px;font-weight:700;color:#ffffff;text-align:center;white-space:nowrap;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;">{item['score']}</td></tr></table>
                 </div>
               </td>
             </tr>"""
@@ -361,7 +364,7 @@ def render_email(items: list[dict], feed_warnings: list[dict]) -> tuple[str, str
           <td style="background:#f4f5f7;padding:16px 32px;border-top:1px solid #e8e8e8;">
             <div style="font-size:11px;color:#6b778c;text-align:center;">
               Scores reflect relevance to your data leadership learning plan (1–10).<br/>
-              Sources: Databricks†, Seattle Data Guy, DE Weekly, Airbyte†, dbt Blog, Locally Optimistic, Towards Data Science, Eugene Yan, Chip Huyen, The Sequence, Import AI, Ahead of AI, Gradient Flow, Benn Stancil, O'Reilly Radar. &nbsp;†vendor source
+              Sources: Databricks†, Seattle Data Guy, DE Weekly, Airbyte†, dbt Blog, Context &amp; Chaos†, Monte Carlo†, Locally Optimistic, Eugene Yan, Vicki Boykis, The Sequence, Import AI, Ahead of AI, Gradient Flow, One Useful Thing, Benn Stancil, O'Reilly Radar, MIT Sloan Review. &nbsp;†vendor source
             </div>
           </td>
         </tr>
