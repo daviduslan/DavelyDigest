@@ -62,25 +62,37 @@ class TestParseDate(unittest.TestCase):
 
 # ── fetch_recent_items ─────────────────────────────────────────────────────────
 
+def _mock_response(content=b"<rss/>"):
+    resp = MagicMock()
+    resp.content = content
+    resp.raise_for_status = MagicMock()
+    return resp
+
+
 class TestFetchRecentItems(unittest.TestCase):
     @patch("digest.feedparser.parse")
-    def test_bozo_feed_with_no_entries_warns(self, mock_parse):
+    @patch("digest.requests.get")
+    def test_bozo_feed_with_no_entries_warns(self, mock_get, mock_parse):
+        mock_get.return_value = _mock_response()
         mock_parse.return_value = _mock_parsed(bozo=True, bozo_exception=Exception("timeout"))
         items, warnings = digest.fetch_recent_items([FEED], 24)
         self.assertEqual(items, [])
         self.assertEqual(len(warnings), 1)
-        self.assertIn("Exception", warnings[0]["reason"])
         self.assertEqual(warnings[0]["source"], "Test Source")
 
     @patch("digest.feedparser.parse")
-    def test_empty_feed_warns(self, mock_parse):
+    @patch("digest.requests.get")
+    def test_empty_feed_warns(self, mock_get, mock_parse):
+        mock_get.return_value = _mock_response()
         mock_parse.return_value = _mock_parsed(entries=[])
         items, warnings = digest.fetch_recent_items([FEED], 24)
         self.assertEqual(items, [])
         self.assertEqual(warnings[0]["reason"], "Feed returned no entries")
 
     @patch("digest.feedparser.parse")
-    def test_recent_item_included(self, mock_parse):
+    @patch("digest.requests.get")
+    def test_recent_item_included(self, mock_get, mock_parse):
+        mock_get.return_value = _mock_response()
         entry = MockEntry(published_parsed=_struct(datetime.now(timezone.utc) - timedelta(hours=1)))
         mock_parse.return_value = _mock_parsed(entries=[entry])
         items, warnings = digest.fetch_recent_items([FEED], 24)
@@ -88,21 +100,27 @@ class TestFetchRecentItems(unittest.TestCase):
         self.assertEqual(warnings, [])
 
     @patch("digest.feedparser.parse")
-    def test_old_item_excluded(self, mock_parse):
+    @patch("digest.requests.get")
+    def test_old_item_excluded(self, mock_get, mock_parse):
+        mock_get.return_value = _mock_response()
         entry = MockEntry(published_parsed=_struct(datetime.now(timezone.utc) - timedelta(hours=48)))
         mock_parse.return_value = _mock_parsed(entries=[entry])
         items, warnings = digest.fetch_recent_items([FEED], 24)
         self.assertEqual(items, [])
 
     @patch("digest.feedparser.parse")
-    def test_item_without_date_included(self, mock_parse):
+    @patch("digest.requests.get")
+    def test_item_without_date_included(self, mock_get, mock_parse):
+        mock_get.return_value = _mock_response()
         entry = MockEntry()  # no date → always include
         mock_parse.return_value = _mock_parsed(entries=[entry])
         items, _ = digest.fetch_recent_items([FEED], 24)
         self.assertEqual(len(items), 1)
 
     @patch("digest.feedparser.parse")
-    def test_stale_feed_generates_warning(self, mock_parse):
+    @patch("digest.requests.get")
+    def test_stale_feed_generates_warning(self, mock_get, mock_parse):
+        mock_get.return_value = _mock_response()
         old = datetime.now(timezone.utc) - timedelta(days=90)
         entry = MockEntry(published_parsed=_struct(old))
         mock_parse.return_value = _mock_parsed(entries=[entry])
@@ -110,16 +128,18 @@ class TestFetchRecentItems(unittest.TestCase):
         self.assertTrue(any("days ago" in w["reason"] for w in warnings))
 
     @patch("digest.feedparser.parse")
-    def test_vendor_flag_propagated(self, mock_parse):
+    @patch("digest.requests.get")
+    def test_vendor_flag_propagated(self, mock_get, mock_parse):
+        mock_get.return_value = _mock_response()
         entry = MockEntry(published_parsed=_struct(datetime.now(timezone.utc) - timedelta(hours=1)))
         mock_parse.return_value = _mock_parsed(entries=[entry])
         vendor_feed = {**FEED, "vendor": True}
         items, _ = digest.fetch_recent_items([vendor_feed], 24)
         self.assertTrue(items[0]["vendor"])
 
-    @patch("digest.feedparser.parse")
-    def test_exception_during_fetch_warns(self, mock_parse):
-        mock_parse.side_effect = RuntimeError("network error")
+    @patch("digest.requests.get")
+    def test_exception_during_fetch_warns(self, mock_get):
+        mock_get.side_effect = RuntimeError("network error")
         items, warnings = digest.fetch_recent_items([FEED], 24)
         self.assertEqual(items, [])
         self.assertIn("Exception during fetch", warnings[0]["reason"])

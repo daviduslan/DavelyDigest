@@ -10,6 +10,7 @@ import ssl
 import html
 import json
 import smtplib
+import requests
 import feedparser
 from datetime import datetime, timezone, timedelta
 from email.mime.multipart import MIMEMultipart
@@ -34,7 +35,12 @@ LOOKBACK_HOURS = 24
 # Minimum relevance score (1-10) to include in digest
 MIN_SCORE = 6
 
-FEED_USER_AGENT = "Mozilla/5.0 (compatible; DavelyDigest/1.0)"
+FEED_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    "Accept": "application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.7",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Cache-Control": "no-cache",
+}
 
 # ── RSS Feed Sources ───────────────────────────────────────────────────────────
 
@@ -61,7 +67,6 @@ FEEDS = [
     {"url": "https://thesequence.substack.com/feed",                    "domain": "AI & Data",          "source": "The Sequence",                "vendor": False},
     {"url": "https://importai.substack.com/feed",                       "domain": "AI & Data",          "source": "Import AI",                   "vendor": False},
     {"url": "https://magazine.sebastianraschka.com/feed",               "domain": "AI & Data",          "source": "Ahead of AI",                 "vendor": False},
-    {"url": "https://gradientflow.com/blog/feed/",                      "domain": "AI & Data",          "source": "Gradient Flow",               "vendor": False},
     {"url": "https://www.oneusefulthing.org/feed",                      "domain": "AI & Data",          "source": "One Useful Thing",            "vendor": False},
 
     # Data Leadership & Strategy
@@ -131,13 +136,15 @@ def fetch_recent_items(feeds: list[dict], lookback_hours: int) -> tuple[list[dic
 
     for feed_config in feeds:
         try:
-            parsed = feedparser.parse(feed_config["url"], agent=FEED_USER_AGENT)
+            resp = requests.get(feed_config["url"], headers=FEED_HEADERS, timeout=15)
+            resp.raise_for_status()
+            parsed = feedparser.parse(resp.content)
 
             # Check for fetch/parse failure
             if parsed.bozo and not parsed.entries:
                 feed_warnings.append({
                     "source": feed_config["source"],
-                    "reason": f"Failed to fetch or parse feed ({type(parsed.bozo_exception).__name__ if parsed.bozo_exception else 'unknown error'})"
+                    "reason": f"Failed to parse feed ({type(getattr(parsed, 'bozo_exception', None)).__name__})"
                 })
                 continue
 
@@ -364,7 +371,7 @@ def render_email(items: list[dict], feed_warnings: list[dict]) -> tuple[str, str
           <td style="background:#f4f5f7;padding:16px 32px;border-top:1px solid #e8e8e8;">
             <div style="font-size:11px;color:#6b778c;text-align:center;">
               Scores reflect relevance to your data leadership learning plan (1–10).<br/>
-              Sources: Databricks†, Seattle Data Guy, DE Weekly, Airbyte†, dbt Blog, Context &amp; Chaos†, Monte Carlo†, Locally Optimistic, Eugene Yan, Vicki Boykis, The Sequence, Import AI, Ahead of AI, Gradient Flow, One Useful Thing, Benn Stancil, O'Reilly Radar, MIT Sloan Review. &nbsp;†vendor source
+              Sources: Databricks†, Seattle Data Guy, DE Weekly, Airbyte†, dbt Blog, Context &amp; Chaos†, Monte Carlo†, Locally Optimistic, Eugene Yan, Vicki Boykis, The Sequence, Import AI, Ahead of AI, One Useful Thing, Benn Stancil, O'Reilly Radar, MIT Sloan Review. &nbsp;†vendor source
             </div>
           </td>
         </tr>
