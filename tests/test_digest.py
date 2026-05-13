@@ -144,6 +144,34 @@ class TestFetchRecentItems(unittest.TestCase):
         self.assertEqual(items, [])
         self.assertIn("Exception during fetch", warnings[0]["reason"])
 
+    @patch("digest.requests.get")
+    def test_substack_feed_uses_api(self, mock_get):
+        now = datetime.now(timezone.utc)
+        post_date = (now - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        mock_get.return_value.json.return_value = [{
+            "title": "Substack Post",
+            "canonical_url": "https://example.substack.com/p/post",
+            "post_date": post_date,
+            "description": "A summary",
+        }]
+        mock_get.return_value.raise_for_status = MagicMock()
+        substack_feed = {**FEED, "url": "https://example.substack.com/feed"}
+        items, warnings = digest.fetch_recent_items([substack_feed], 24)
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["title"], "Substack Post")
+        # confirm it called the API endpoint, not the RSS feed URL
+        called_url = mock_get.call_args[0][0]
+        self.assertIn("/api/v1/posts", called_url)
+
+    @patch("digest.requests.get")
+    def test_substack_empty_response_warns(self, mock_get):
+        mock_get.return_value.json.return_value = []
+        mock_get.return_value.raise_for_status = MagicMock()
+        substack_feed = {**FEED, "url": "https://example.substack.com/feed"}
+        items, warnings = digest.fetch_recent_items([substack_feed], 24)
+        self.assertEqual(items, [])
+        self.assertEqual(warnings[0]["reason"], "Feed returned no entries")
+
 
 # ── score_and_annotate ─────────────────────────────────────────────────────────
 

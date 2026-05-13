@@ -125,6 +125,48 @@ def _parse_date(entry) -> datetime | None:
         return datetime(*entry.updated_parsed[:6], tzinfo=timezone.utc)
     return None
 
+
+def _fetch_substack(feed_config: dict, cutoff: datetime, stale_cutoff: datetime) -> tuple[list[dict], list[dict]]:
+    """Use the Substack JSON API instead of RSS — avoids Cloudflare blocking on CI IPs."""
+    base = "/".join(feed_config["url"].split("/")[:3])  # https://slug.substack.com
+    api_url = f"{base}/api/v1/posts?limit=50"
+    resp = requests.get(api_url, headers={**FEED_HEADERS, "Accept": "application/json"}, timeout=15)
+    resp.raise_for_status()
+    posts = resp.json()
+
+    if not posts:
+        return [], [{"source": feed_config["source"], "reason": "Feed returned no entries"}]
+
+    warnings = []
+    dates = [datetime.fromisoformat(p["post_date"].replace("Z", "+00:00")) for p in posts if p.get("post_date")]
+    if dates:
+        most_recent = max(dates)
+        if most_recent < stale_cutoff:
+            days_ago = (datetime.now(timezone.utc) - most_recent).days
+            warnings.append({"source": feed_config["source"], "reason": f"Last post was {days_ago} days ago"})
+
+    items = []
+    for post in posts:
+        published = None
+        if post.get("post_date"):
+            published = datetime.fromisoformat(post["post_date"].replace("Z", "+00:00"))
+
+        if published is None or published >= cutoff:
+            raw = post.get("description") or post.get("body_html", "")
+            summary = re.sub(r"<[^>]+>", "", raw)[:500]
+            items.append({
+                "title":     post.get("title", "No title"),
+                "url":       post.get("canonical_url", ""),
+                "summary":   summary,
+                "source":    feed_config["source"],
+                "domain":    feed_config["domain"],
+                "vendor":    feed_config.get("vendor", False),
+                "published": published.strftime("%b %d") if published else "Recent",
+            })
+
+    return items, warnings
+
+
 def fetch_recent_items(feeds: list[dict], lookback_hours: int) -> tuple[list[dict], list[dict]]:
     """Fetch RSS feed items published within the lookback window.
     Returns (items, feed_warnings) where feed_warnings is a list of dicts
@@ -136,6 +178,12 @@ def fetch_recent_items(feeds: list[dict], lookback_hours: int) -> tuple[list[dic
 
     for feed_config in feeds:
         try:
+            if "substack.com" in feed_config["url"]:
+                new_items, new_warnings = _fetch_substack(feed_config, cutoff, stale_cutoff)
+                items.extend(new_items)
+                feed_warnings.extend(new_warnings)
+                continue
+
             resp = requests.get(feed_config["url"], headers=FEED_HEADERS, timeout=15)
             resp.raise_for_status()
             parsed = feedparser.parse(resp.content)
