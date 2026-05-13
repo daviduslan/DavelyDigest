@@ -34,6 +34,8 @@ LOOKBACK_HOURS = 24
 # Minimum relevance score (1-10) to include in digest
 MIN_SCORE = 6
 
+FEED_USER_AGENT = "Mozilla/5.0 (compatible; DavelyDigest/1.0)"
+
 # ── RSS Feed Sources ───────────────────────────────────────────────────────────
 
 FEEDS = [
@@ -45,8 +47,6 @@ FEEDS = [
     {"url": "https://www.getdbt.com/blog/rss.xml",                      "domain": "Data Engineering",   "source": "dbt Blog",                    "vendor": False},
 
     # Data Governance
-    {"url": "https://tdwi.org/rss-feeds/all-articles.aspx",             "domain": "Data Governance",    "source": "TDWI",                        "vendor": False},
-    {"url": "https://atlan.com/blog/rss/",                              "domain": "Data Governance",    "source": "Atlan Blog",                  "vendor": True},
 
     # Analytics & BI
     {"url": "https://locallyoptimistic.com/feed/",                      "domain": "Analytics & BI",     "source": "Locally Optimistic",          "vendor": False},
@@ -65,7 +65,6 @@ FEEDS = [
     # Data Leadership & Strategy
     {"url": "https://benn.substack.com/feed",                           "domain": "Data Leadership",    "source": "Benn Stancil",                "vendor": False},
     {"url": "https://www.oreilly.com/radar/topics/data/feed/index.xml", "domain": "Data Leadership",    "source": "O'Reilly Radar",              "vendor": False},
-    {"url": "https://hdsr.mitpress.mit.edu/rss/feed.xml",               "domain": "Data Leadership",    "source": "Harvard Data Science Review", "vendor": False},
 ]
 
 # ── Learning plan context (used in the Claude prompt) ─────────────────────────
@@ -129,7 +128,7 @@ def fetch_recent_items(feeds: list[dict], lookback_hours: int) -> tuple[list[dic
 
     for feed_config in feeds:
         try:
-            parsed = feedparser.parse(feed_config["url"])
+            parsed = feedparser.parse(feed_config["url"], agent=FEED_USER_AGENT)
 
             # Check for fetch/parse failure
             if parsed.bozo and not parsed.entries:
@@ -362,7 +361,7 @@ def render_email(items: list[dict], feed_warnings: list[dict]) -> tuple[str, str
           <td style="background:#f4f5f7;padding:16px 32px;border-top:1px solid #e8e8e8;">
             <div style="font-size:11px;color:#6b778c;text-align:center;">
               Scores reflect relevance to your data leadership learning plan (1–10).<br/>
-              Sources: Databricks†, Seattle Data Guy, DE Weekly, Airbyte†, dbt Blog, Atlan†, TDWI, Locally Optimistic, Towards Data Science, Eugene Yan, Chip Huyen, The Sequence, Import AI, Ahead of AI, Gradient Flow, Benn Stancil, O'Reilly Radar, Harvard DSR. &nbsp;†vendor source
+              Sources: Databricks†, Seattle Data Guy, DE Weekly, Airbyte†, dbt Blog, Locally Optimistic, Towards Data Science, Eugene Yan, Chip Huyen, The Sequence, Import AI, Ahead of AI, Gradient Flow, Benn Stancil, O'Reilly Radar. &nbsp;†vendor source
             </div>
           </td>
         </tr>
