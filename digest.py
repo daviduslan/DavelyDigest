@@ -165,7 +165,13 @@ Respond with ONLY the JSON array, no preamble or markdown fences."""
     )
 
     try:
-        scored = json.loads(response.content[0].text)
+        raw = response.content[0].text.strip()
+        if raw.startswith("```"):
+            raw = raw.split("```", 2)[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+            raw = raw.rsplit("```", 1)[0].strip()
+        scored = json.loads(raw)
         score_map = {s["id"]: s for s in scored}
         for i, item in enumerate(items):
             if i in score_map:
