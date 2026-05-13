@@ -24,7 +24,7 @@ SMTP_PASSWORD   = os.environ["SMTP_PASSWORD"]
 ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
 
 # How many hours back to look for new items (24 = daily)
-LOOKBACK_HOURS = 24
+LOOKBACK_HOURS = 72
 
 # Minimum relevance score (1-10) to include in digest
 MIN_SCORE = 6
@@ -176,6 +176,7 @@ Respond with ONLY the JSON array, no preamble or markdown fences."""
                 item["editorial_note"] = ""
     except json.JSONDecodeError as e:
         print(f"⚠️  Failed to parse Claude response: {e}")
+        print(f"   Raw response: {response.content[0].text[:500]}")
         for item in items:
             item["score"] = 5
             item["editorial_note"] = ""
