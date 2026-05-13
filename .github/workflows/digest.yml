@@ -1,11 +1,12 @@
 name: Daily Data Leadership Digest
 
 on:
-  schedule:
-    # 14:00 UTC = 7 AM PDT (Mar–Nov). Shifts to 6 AM PST in winter — update to 15 UTC then.
-    - cron: "0 14 * * 1-5"   # Weekdays only — change to "0 14 * * *" for daily including weekends
+  # Schedule disabled — digest now runs via launchd on local machine.
+  # Re-enable the schedule block below to restore GitHub Actions as runner.
+  # schedule:
+  #   - cron: "0 14 * * 1-5"
 
-  # Allows you to run manually from the Actions tab to test
+  # Manual trigger kept for one-off testing from the Actions tab
   workflow_dispatch:
 
 jobs:
