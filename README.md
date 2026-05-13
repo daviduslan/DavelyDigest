@@ -1,92 +1,117 @@
-# Data Leadership Digest
+# Davely Digest
 
 A daily email digest that crawls curated data industry RSS feeds, scores each item for
-relevance to a data leadership learning plan using Claude, and emails a formatted digest
+relevance to a personalized learning plan using Claude, and sends a formatted HTML email
 with editorial notes explaining why each article matters.
 
 ## What it does
 
-1. Fetches the last 24 hours of posts from ~15 curated sources across five domains
+1. Fetches the last 24 hours of posts from ~18 curated sources across five domains
 2. Sends all items to Claude API for relevance scoring (1–10) and editorial annotation
 3. Filters to items scoring ≥ 6, groups by domain, sorts by score
-4. Sends a formatted HTML digest email
+4. Sends a formatted HTML digest email with feed health warnings for any stale or broken sources
 
-Runs automatically via GitHub Actions on a schedule (default: 7 AM Pacific, weekdays).
+Runs automatically via **launchd** on your local Mac (Mon–Fri at 7 AM local time).
 
 ---
 
 ## Setup
 
-### 1. Create a GitHub repository
+### 1. Clone the repo
 
-Create a new **private** repo (recommended — keeps your secrets context private).
-Push all files from this project into it, preserving the directory structure:
-
-```
-your-repo/
-├── digest.py
-├── requirements.txt
-└── .github/
-    └── workflows/
-        └── digest.yml
+```bash
+git clone <your-repo-url>
+cd DavelyDigest
 ```
 
-### 2. Set up email sending
+### 2. Install dependencies
 
-The script uses standard SMTP. The easiest option is a **Gmail App Password**:
-
-1. Go to your Google Account → Security → 2-Step Verification (must be enabled)
-2. Under "2-Step Verification", scroll to **App passwords**
-3. Create a new app password — name it "Data Digest"
-4. Copy the 16-character password
-
-Your SMTP settings will be:
-- `SMTP_HOST`: `smtp.gmail.com`
-- `SMTP_PORT`: `587`
-- `SMTP_USER`: your Gmail address (e.g. `you@gmail.com`)
-- `SMTP_PASSWORD`: the 16-character app password
-- `DIGEST_SENDER_EMAIL`: your Gmail address
-- `DIGEST_RECIPIENT_EMAIL`: wherever you want to receive it (can be same address)
-
-### 3. Add GitHub Actions secrets
-
-In your GitHub repo: **Settings → Secrets and variables → Actions → New repository secret**
-
-Add each of these:
-
-| Secret name               | Value                        |
-|---------------------------|------------------------------|
-| `ANTHROPIC_API_KEY`       | Your Anthropic API key       |
-| `DIGEST_RECIPIENT_EMAIL`  | Your email address           |
-| `DIGEST_SENDER_EMAIL`     | Your Gmail address           |
-| `SMTP_HOST`               | `smtp.gmail.com`             |
-| `SMTP_PORT`               | `587`                        |
-| `SMTP_USER`               | Your Gmail address           |
-| `SMTP_PASSWORD`           | Your Gmail app password      |
-
-### 4. Test it manually
-
-Once secrets are set:
-1. Go to your repo → **Actions** tab
-2. Click **Daily Data Leadership Digest** in the left sidebar
-3. Click **Run workflow** → **Run workflow**
-4. Watch the run logs — you should receive an email within ~2 minutes
-
-### 5. Adjust the schedule
-
-The default schedule in `digest.yml` is 7:00 AM Pacific, weekdays only.
-
-To change the time, edit the cron expression:
-```yaml
-- cron: "0 15 * * 1-5"
-#         │  │  │ │ └── Days of week (1-5 = Mon-Fri; * = every day)
-#         │  └──┘ └──── Month / Day of month (* = every)
-#         └──────────── Hour in UTC (15 UTC = 7 AM PDT / 8 AM PST)
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
-Common alternatives:
-- `"0 14 * * 1-5"` → 6 AM Pacific (PDT)
-- `"0 15 * * *"`   → 7 AM Pacific every day including weekends
+### 3. Create your `.env` file
+
+Copy the example and fill in your values:
+
+```bash
+cp .env.example .env
+```
+
+Open `.env` and set:
+
+```
+ANTHROPIC_API_KEY=sk-ant-...
+DIGEST_RECIPIENT_EMAIL=you@example.com
+DIGEST_SENDER_EMAIL=you@gmail.com
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=you@gmail.com
+SMTP_PASSWORD=your-app-password
+```
+
+**Gmail App Password setup:**
+1. Google Account → Security → 2-Step Verification (must be enabled)
+2. Search for **App passwords**, create one named "Davely Digest"
+3. Use the 16-character password as `SMTP_PASSWORD`
+
+> All values in `.env` must be quoted if they contain spaces or special characters.
+> `.env` is gitignored and will never be committed.
+
+### 4. Create your learning plan context
+
+Create a file called `context.local.txt` in the project root. This is what Claude uses
+to evaluate article relevance — write it to describe your role, goals, and focus areas.
+It is gitignored and stays private.
+
+Example:
+```
+I'm a data leader focused on building and scaling a modern data platform.
+My priorities are data engineering (dbt, Airflow, lakehouse architecture),
+data governance, and helping non-technical stakeholders make data-driven decisions.
+Prefer strategic and leadership-oriented content over deep technical tutorials.
+```
+
+If `context.local.txt` is missing, the digest still runs — Claude just scores without
+personalized context.
+
+### 5. Test the digest manually
+
+```bash
+./run_local.sh
+```
+
+You should receive an email within ~2 minutes.
+
+### 6. Schedule it with launchd (Mac only)
+
+Install the included launchd agent to run the digest automatically Mon–Fri at 7 AM:
+
+```bash
+cp com.davelydigest.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.davelydigest.plist
+```
+
+> If your Mac is asleep at 7 AM, the job runs as soon as it wakes up.
+
+**Useful commands:**
+
+```bash
+# Trigger a manual run
+launchctl start com.davelydigest
+
+# Check last exit code
+launchctl list | grep davelydigest
+
+# View logs
+tail -f ~/Library/Logs/davelydigest.log
+tail -f ~/Library/Logs/davelydigest.error.log
+
+# Disable the schedule
+launchctl unload ~/Library/LaunchAgents/com.davelydigest.plist
+```
 
 ---
 
@@ -95,31 +120,51 @@ Common alternatives:
 ### Adding or removing sources
 
 Edit the `FEEDS` list in `digest.py`. Each entry needs:
+
 ```python
-{"url": "https://example.com/feed.xml", "domain": "Data Engineering", "source": "Example Blog"}
+{"url": "https://example.com/feed.xml", "domain": "Data Engineering", "source": "Example Blog", "vendor": False}
 ```
 
+Set `"vendor": True` for content published by vendors/companies selling a product — these
+get a badge in the email so you can calibrate accordingly.
+
 Valid domain values (used for grouping and color coding):
-- `"Data Engineering"`
-- `"Data Governance"`
-- `"Analytics & BI"`
-- `"Data Science & ML"`
-- `"Data Leadership"`
+
+| Domain | Color |
+|---|---|
+| `"Data Engineering"` | Blue |
+| `"Data Governance"` | Purple |
+| `"Analytics & BI"` | Teal |
+| `"Data Science & ML"` | Orange |
+| `"AI & Data"` | Red |
+| `"Data Leadership"` | Green |
+
+**Substack feeds** are fetched via the Substack JSON API (`/api/v1/posts`) rather than RSS,
+which improves reliability.
 
 ### Adjusting the relevance threshold
 
 Change `MIN_SCORE` in `digest.py` (default: `6`).
-Raise to `7` or `8` for a tighter, shorter digest. Lower to `5` for more volume.
+Raise to `7`–`8` for a tighter digest. Lower to `5` for more volume.
 
 ### Updating your learning plan context
 
-The `LEARNING_PLAN_CONTEXT` string in `digest.py` is what Claude uses to evaluate relevance.
-As your focus areas evolve, update this string to reflect where you are in your development plan.
+Edit `context.local.txt` any time your focus areas evolve. No code change needed.
+
+---
+
+## Feed health
+
+The digest automatically warns you when a feed:
+- Returns no entries
+- Has a parse error
+- Has not published anything in 60+ days
+
+Warnings appear at the bottom of each email so you can decide whether to replace stale sources.
 
 ---
 
 ## Cost estimate
 
-Each run makes one Claude API call with ~15–40 articles.
-Typical cost: **$0.01–0.03 per day** (~$0.30–0.90/month).
-GitHub Actions: free tier includes 2,000 minutes/month — this job uses ~1–2 minutes per run.
+Each run makes one Claude API call covering all articles fetched that day.
+Typical cost: **$0.01–0.03 per run** (~$0.25–0.65/month for weekday-only runs).
