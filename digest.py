@@ -82,43 +82,83 @@ is more valuable than deep technical tutorials.
 
 # ── Feed fetching ──────────────────────────────────────────────────────────────
 
-def fetch_recent_items(feeds: list[dict], lookback_hours: int) -> list[dict]:
-    """Fetch RSS feed items published within the lookback window."""
+def fetch_recent_items(feeds: list[dict], lookback_hours: int) -> tuple[list[dict], list[dict]]:
+    """Fetch RSS feed items published within the lookback window.
+    Returns (items, feed_warnings) where feed_warnings is a list of dicts
+    with 'source' and 'reason' keys."""
     cutoff = datetime.now(timezone.utc) - timedelta(hours=lookback_hours)
+    stale_cutoff = datetime.now(timezone.utc) - timedelta(days=60)
     items = []
+    feed_warnings = []
 
     for feed_config in feeds:
         try:
             parsed = feedparser.parse(feed_config["url"])
+
+            # Check for fetch/parse failure
+            if parsed.bozo and not parsed.entries:
+                feed_warnings.append({
+                    "source": feed_config["source"],
+                    "reason": f"Failed to fetch or parse feed ({type(parsed.bozo_exception).__name__ if parsed.bozo_exception else 'unknown error'})"
+                })
+                continue
+
+            if not parsed.entries:
+                feed_warnings.append({
+                    "source": feed_config["source"],
+                    "reason": "Feed returned no entries"
+                })
+                continue
+
+            # Check for stale feed — look at most recent entry date
+            most_recent = None
             for entry in parsed.entries:
-                # Parse published date — feedparser normalizes to time.struct_time
+                pub = None
+                if hasattr(entry, "published_parsed") and entry.published_parsed:
+                    pub = datetime(*entry.published_parsed[:6], tzinfo=timezone.utc)
+                elif hasattr(entry, "updated_parsed") and entry.updated_parsed:
+                    pub = datetime(*entry.updated_parsed[:6], tzinfo=timezone.utc)
+                if pub and (most_recent is None or pub > most_recent):
+                    most_recent = pub
+
+            if most_recent and most_recent < stale_cutoff:
+                days_ago = (datetime.now(timezone.utc) - most_recent).days
+                feed_warnings.append({
+                    "source": feed_config["source"],
+                    "reason": f"Last post was {days_ago} days ago"
+                })
+
+            # Normal item collection
+            for entry in parsed.entries:
                 published = None
                 if hasattr(entry, "published_parsed") and entry.published_parsed:
                     published = datetime(*entry.published_parsed[:6], tzinfo=timezone.utc)
                 elif hasattr(entry, "updated_parsed") and entry.updated_parsed:
                     published = datetime(*entry.updated_parsed[:6], tzinfo=timezone.utc)
 
-                # Include if within window (or if date unavailable, include anyway)
                 if published is None or published >= cutoff:
                     summary = ""
                     if hasattr(entry, "summary"):
-                        # Strip basic HTML tags for cleaner text
                         import re
                         summary = re.sub(r"<[^>]+>", "", entry.summary)[:500]
 
                     items.append({
-                        "title":   entry.get("title", "No title"),
-                        "url":     entry.get("link", ""),
-                        "summary": summary,
-                        "source":  feed_config["source"],
-                        "domain":  feed_config["domain"],
+                        "title":     entry.get("title", "No title"),
+                        "url":       entry.get("link", ""),
+                        "summary":   summary,
+                        "source":    feed_config["source"],
+                        "domain":    feed_config["domain"],
+                        "vendor":    feed_config.get("vendor", False),
                         "published": published.strftime("%b %d") if published else "Recent",
-                        "vendor":  feed_config.get("vendor", False),
                     })
-        except Exception as e:
-            print(f"⚠️  Failed to fetch {feed_config['source']}: {e}")
 
-    return items
+        except Exception as e:
+            feed_warnings.append({
+                "source": feed_config["source"],
+                "reason": f"Exception during fetch: {e}"
+            })
+
+    return items, feed_warnings
 
 # ── AI relevance scoring ───────────────────────────────────────────────────────
 
@@ -199,7 +239,7 @@ DOMAIN_COLORS = {
     "Data Leadership":    "#ff7452",
 }
 
-def render_email(items: list[dict]) -> tuple[str, str]:
+def render_email(items: list[dict], feed_warnings: list[dict]) -> tuple[str, str]:
     """Returns (subject, html_body) for the digest email."""
     today = datetime.now().strftime("%A, %B %d")
     count = len(items)
@@ -243,6 +283,22 @@ def render_email(items: list[dict]) -> tuple[str, str]:
           </td>
         </tr>"""
 
+    warnings_html = ""
+    if feed_warnings:
+        warning_rows = "".join(
+            f'<tr><td style="padding:3px 0;font-size:11px;color:#6b778c;">⚠️ <strong>{w["source"]}</strong> — {w["reason"]}</td></tr>'
+            for w in feed_warnings
+        )
+        warnings_html = f"""
+        <tr>
+          <td style="padding:16px 32px 0;">
+            <div style="background:#fffbe6;border:1px solid #ffe58f;border-radius:4px;padding:12px 16px;">
+              <div style="font-size:11px;font-weight:700;color:#ad6800;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Feed Health Warnings</div>
+              <table cellpadding="0" cellspacing="0" border="0">{warning_rows}</table>
+            </div>
+          </td>
+        </tr>"""
+
     html = f"""<!DOCTYPE html>
 <html>
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
@@ -269,6 +325,7 @@ def render_email(items: list[dict]) -> tuple[str, str]:
           </td>
         </tr>
 
+{warnings_html}
         <!-- Footer -->
         <tr>
           <td style="background:#f4f5f7;padding:16px 32px;border-top:1px solid #e8e8e8;">
@@ -309,8 +366,12 @@ def send_email(subject: str, html_body: str):
 
 def main():
     print(f"🔍 Fetching feeds (last {LOOKBACK_HOURS}h)...")
-    items = fetch_recent_items(FEEDS, LOOKBACK_HOURS)
+    items, feed_warnings = fetch_recent_items(FEEDS, LOOKBACK_HOURS)
     print(f"   Found {len(items)} raw items")
+    if feed_warnings:
+        print(f"   ⚠️  {len(feed_warnings)} feed warning(s):")
+        for w in feed_warnings:
+            print(f"      {w['source']}: {w['reason']}")
 
     if not items:
         print("   No new items found — skipping email.")
@@ -330,7 +391,7 @@ def main():
         return
 
     print("📧 Sending digest email...")
-    subject, html = render_email(relevant)
+    subject, html = render_email(relevant, feed_warnings)
     send_email(subject, html)
 
 if __name__ == "__main__":
