@@ -9,7 +9,8 @@ if [[ ! -f "$ENV_FILE" ]]; then
 fi
 
 # Unset any ambient env vars so the local .env file wins unconditionally
-unset ANTHROPIC_API_KEY DIGEST_RECIPIENT_EMAIL DIGEST_SENDER_EMAIL \
+unset ANTHROPIC_API_KEY ANTHROPIC_BASE_URL \
+      DIGEST_RECIPIENT_EMAIL DIGEST_SENDER_EMAIL \
       SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASSWORD
 
 set -a
