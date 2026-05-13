@@ -1,0 +1,37 @@
+name: Daily Data Leadership Digest
+
+on:
+  schedule:
+    # Runs at 7:00 AM Pacific time (15:00 UTC)
+    # Adjust hour to your preference: UTC = Pacific + 7 (PDT) or + 8 (PST)
+    - cron: "0 15 * * 1-5"   # Weekdays only — change to "0 15 * * *" for daily including weekends
+
+  # Allows you to run manually from the Actions tab to test
+  workflow_dispatch:
+
+jobs:
+  send-digest:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run digest
+        env:
+          ANTHROPIC_API_KEY:       ${{ secrets.ANTHROPIC_API_KEY }}
+          DIGEST_RECIPIENT_EMAIL:  ${{ secrets.DIGEST_RECIPIENT_EMAIL }}
+          DIGEST_SENDER_EMAIL:     ${{ secrets.DIGEST_SENDER_EMAIL }}
+          SMTP_HOST:               ${{ secrets.SMTP_HOST }}
+          SMTP_PORT:               ${{ secrets.SMTP_PORT }}
+          SMTP_USER:               ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD:           ${{ secrets.SMTP_PASSWORD }}
+        run: python digest.py
