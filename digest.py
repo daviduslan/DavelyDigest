@@ -24,7 +24,7 @@ SMTP_PASSWORD   = os.environ["SMTP_PASSWORD"]
 ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
 
 # How many hours back to look for new items (24 = daily)
-LOOKBACK_HOURS = 72
+LOOKBACK_HOURS = 24
 
 # Minimum relevance score (1-10) to include in digest
 MIN_SCORE = 6
