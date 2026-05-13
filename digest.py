@@ -47,7 +47,7 @@ FEED_HEADERS = {
 FEEDS = [
     # Data Engineering
     {"url": "https://www.databricks.com/feed",                          "domain": "Data Engineering",   "source": "Databricks Blog",             "vendor": True},
-    {"url": "https://medium.com/feed/@seattledataguy",                  "domain": "Data Engineering",   "source": "Seattle Data Guy",            "vendor": False},
+    {"url": "https://medium.com/feed/towards-data-engineering",          "domain": "Data Engineering",   "source": "Towards Data Engineering",    "vendor": False},
     {"url": "https://www.dataengineeringweekly.com/feed",               "domain": "Data Engineering",   "source": "Data Engineering Weekly",     "vendor": False},
     {"url": "https://airbyte.com/blog/rss.xml",                         "domain": "Data Engineering",   "source": "Airbyte Blog",                "vendor": True},
     {"url": "https://www.getdbt.com/blog/rss.xml",                      "domain": "Data Engineering",   "source": "dbt Blog",                    "vendor": False},
@@ -57,7 +57,8 @@ FEEDS = [
     {"url": "https://www.montecarlodata.com/feed/",                     "domain": "Data Governance",    "source": "Monte Carlo Data",            "vendor": True},
 
     # Analytics & BI
-    {"url": "https://locallyoptimistic.com/feed/",                      "domain": "Analytics & BI",     "source": "Locally Optimistic",          "vendor": False},
+    {"url": "https://davidsj.substack.com/feed",                         "domain": "Analytics & BI",     "source": "Data with David",             "vendor": False},
+    {"url": "https://blog.rittmananalytics.com/feed",                    "domain": "Analytics & BI",     "source": "Rittman Analytics",           "vendor": True},
 
     # Data Science & ML
     {"url": "https://eugeneyan.com/rss/",                               "domain": "Data Science & ML",  "source": "Eugene Yan",                  "vendor": False},
