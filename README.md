@@ -1,6 +1,6 @@
 # Davely Digest
 
-A daily email digest that crawls curated data industry RSS feeds, scores each item for
+A daily email digest that crawls curated, personalized RSS feeds, scores each item for
 relevance to a personalized learning plan using Claude, and sends a formatted HTML email
 with editorial notes explaining why each article matters.
 
