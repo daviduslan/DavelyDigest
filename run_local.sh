@@ -8,9 +8,11 @@ if [[ ! -f "$ENV_FILE" ]]; then
     exit 1
 fi
 
-# Load env vars without exporting them to subshells beyond this script
+# Unset any ambient env vars so the local .env file wins unconditionally
+unset ANTHROPIC_API_KEY DIGEST_RECIPIENT_EMAIL DIGEST_SENDER_EMAIL \
+      SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASSWORD
+
 set -a
-# shellcheck source=.env.local
 source "$ENV_FILE"
 set +a
 
