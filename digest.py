@@ -47,7 +47,7 @@ FEED_HEADERS = {
 FEEDS = [
     # Data Engineering
     {"url": "https://www.databricks.com/feed",                          "domain": "Data Engineering",   "source": "Databricks Blog",             "vendor": True},
-    {"url": "https://seattledataguy.substack.com/feed",                 "domain": "Data Engineering",   "source": "Seattle Data Guy",            "vendor": False},
+    {"url": "https://medium.com/feed/@seattledataguy",                  "domain": "Data Engineering",   "source": "Seattle Data Guy",            "vendor": False},
     {"url": "https://www.dataengineeringweekly.com/feed",               "domain": "Data Engineering",   "source": "Data Engineering Weekly",     "vendor": False},
     {"url": "https://airbyte.com/blog/rss.xml",                         "domain": "Data Engineering",   "source": "Airbyte Blog",                "vendor": True},
     {"url": "https://www.getdbt.com/blog/rss.xml",                      "domain": "Data Engineering",   "source": "dbt Blog",                    "vendor": False},
