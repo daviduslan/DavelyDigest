@@ -33,29 +33,28 @@ MIN_SCORE = 6
 
 FEEDS = [
     # Data Engineering
-    {"url": "https://www.databricks.com/feed",                          "domain": "Data Engineering",    "source": "Databricks Blog"},
-    {"url": "https://seattledataguy.substack.com/feed",                 "domain": "Data Engineering",    "source": "Seattle Data Guy"},
-    {"url": "https://www.dataengineeringweekly.com/feed",               "domain": "Data Engineering",    "source": "Data Engineering Weekly"},
-    {"url": "https://airbyte.com/blog/rss.xml",                         "domain": "Data Engineering",    "source": "Airbyte Blog"},
+    {"url": "https://www.databricks.com/feed",                          "domain": "Data Engineering",   "source": "Databricks Blog",             "vendor": True},
+    {"url": "https://seattledataguy.substack.com/feed",                 "domain": "Data Engineering",   "source": "Seattle Data Guy",            "vendor": False},
+    {"url": "https://www.dataengineeringweekly.com/feed",               "domain": "Data Engineering",   "source": "Data Engineering Weekly",     "vendor": False},
+    {"url": "https://airbyte.com/blog/rss.xml",                         "domain": "Data Engineering",   "source": "Airbyte Blog",                "vendor": True},
+    {"url": "https://www.getdbt.com/blog/rss.xml",                      "domain": "Data Engineering",   "source": "dbt Blog",                    "vendor": False},
 
     # Data Governance
-    {"url": "https://tdwi.org/rss-feeds/all-articles.aspx",            "domain": "Data Governance",     "source": "TDWI"},
-    {"url": "https://atlan.com/blog/rss/",                              "domain": "Data Governance",     "source": "Atlan Blog"},
+    {"url": "https://tdwi.org/rss-feeds/all-articles.aspx",             "domain": "Data Governance",    "source": "TDWI",                        "vendor": False},
+    {"url": "https://atlan.com/blog/rss/",                              "domain": "Data Governance",    "source": "Atlan Blog",                  "vendor": True},
 
     # Analytics & BI
-    {"url": "https://locallyoptimistic.com/feed/",                      "domain": "Analytics & BI",      "source": "Locally Optimistic"},
-    {"url": "https://medium.com/feed/towards-data-science",             "domain": "Analytics & BI",      "source": "Towards Data Science"},
-    {"url": "https://mode.com/blog/rss/",                               "domain": "Analytics & BI",      "source": "Mode Blog"},
+    {"url": "https://locallyoptimistic.com/feed/",                      "domain": "Analytics & BI",     "source": "Locally Optimistic",          "vendor": False},
+    {"url": "https://medium.com/feed/towards-data-science",             "domain": "Analytics & BI",     "source": "Towards Data Science",        "vendor": False},
 
     # Data Science & ML
-    {"url": "https://blog.research.google/atom.xml",                    "domain": "Data Science & ML",   "source": "Google Research Blog"},
-    {"url": "https://huggingface.co/blog/feed.xml",                     "domain": "Data Science & ML",   "source": "Hugging Face Blog"},
-    {"url": "https://eugeneyan.com/rss/",                               "domain": "Data Science & ML",   "source": "Eugene Yan"},
+    {"url": "https://eugeneyan.com/rss/",                               "domain": "Data Science & ML",  "source": "Eugene Yan",                  "vendor": False},
+    {"url": "https://huyenchip.com/feed.xml",                           "domain": "Data Science & ML",  "source": "Chip Huyen",                  "vendor": False},
 
     # Data Leadership & Strategy
-    {"url": "https://benn.substack.com/feed",                           "domain": "Data Leadership",     "source": "Benn Stancil"},
-    {"url": "https://www.oreilly.com/radar/topics/data/feed/index.xml", "domain": "Data Leadership",     "source": "O'Reilly Radar"},
-    {"url": "https://hdsr.mitpress.mit.edu/rss/feed.xml",              "domain": "Data Leadership",     "source": "Harvard Data Science Review"},
+    {"url": "https://benn.substack.com/feed",                           "domain": "Data Leadership",    "source": "Benn Stancil",                "vendor": False},
+    {"url": "https://www.oreilly.com/radar/topics/data/feed/index.xml", "domain": "Data Leadership",    "source": "O'Reilly Radar",              "vendor": False},
+    {"url": "https://hdsr.mitpress.mit.edu/rss/feed.xml",               "domain": "Data Leadership",    "source": "Harvard Data Science Review", "vendor": False},
 ]
 
 # ── Learning plan context (used in the Claude prompt) ─────────────────────────
@@ -114,6 +113,7 @@ def fetch_recent_items(feeds: list[dict], lookback_hours: int) -> list[dict]:
                         "source":  feed_config["source"],
                         "domain":  feed_config["domain"],
                         "published": published.strftime("%b %d") if published else "Recent",
+                        "vendor":  feed_config.get("vendor", False),
                     })
         except Exception as e:
             print(f"⚠️  Failed to fetch {feed_config['source']}: {e}")
@@ -225,10 +225,10 @@ def render_email(items: list[dict]) -> tuple[str, str]:
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
                   <div style="flex:1;">
                     <a href="{item['url']}" style="font-size:14px;font-weight:600;color:#172b4d;text-decoration:none;line-height:1.4;">{item['title']}</a>
-                    <div style="margin-top:4px;font-size:11px;color:#6b778c;">{item['source']} · {item['published']}</div>
+                    <div style="margin-top:4px;font-size:11px;color:#6b778c;">{item['source']} · {item['published']}{' · <span style="color:#ff7452;font-weight:600;">vendor source</span>' if item.get('vendor') else ''}</div>
                     {f'<div style="margin-top:8px;font-size:13px;color:#42526e;line-height:1.5;background:#f8f9fa;border-left:3px solid {color};padding:6px 10px;border-radius:0 3px 3px 0;">{item["editorial_note"]}</div>' if item.get("editorial_note") else ""}
                   </div>
-                  <div style="flex-shrink:0;width:28px;height:28px;border-radius:50%;background:{score_color};color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;text-align:center;line-height:28px;">{item['score']}</div>
+                  <div style="flex-shrink:0;min-width:28px;height:28px;padding:0 6px;border-radius:14px;background:{score_color};color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;text-align:center;line-height:28px;">{item['score']}</div>
                 </div>
               </td>
             </tr>"""
@@ -274,7 +274,7 @@ def render_email(items: list[dict]) -> tuple[str, str]:
           <td style="background:#f4f5f7;padding:16px 32px;border-top:1px solid #e8e8e8;">
             <div style="font-size:11px;color:#6b778c;text-align:center;">
               Scores reflect relevance to your data leadership learning plan (1–10).<br/>
-              Sources: Databricks, Seattle Data Guy, DE Weekly, Atlan, TDWI, Locally Optimistic, Towards Data Science, Google Research, Hugging Face, Eugene Yan, Benn Stancil, O'Reilly Radar, Harvard DSR.
+              Sources: Databricks†, Seattle Data Guy, DE Weekly, Airbyte†, dbt Blog, Atlan†, TDWI, Locally Optimistic, Towards Data Science, Eugene Yan, Chip Huyen, Benn Stancil, O'Reilly Radar, Harvard DSR. &nbsp;†vendor source
             </div>
           </td>
         </tr>
