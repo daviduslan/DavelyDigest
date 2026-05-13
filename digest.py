@@ -302,14 +302,16 @@ def render_email(items: list[dict], feed_warnings: list[dict]) -> tuple[str, str
             items_html += f"""
             <tr>
               <td style="padding:14px 0;border-bottom:1px solid #f0f0f0;">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
-                  <div style="flex:1;">
+                <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+                  <td style="vertical-align:top;padding-right:12px;">
                     <a href="{href}" style="font-size:14px;font-weight:600;color:#172b4d;text-decoration:none;line-height:1.4;">{title}</a>
                     <div style="margin-top:4px;font-size:11px;color:#6b778c;">{source} · {published}{vendor_badge}</div>
                     {note_html}
-                  </div>
-                  <table cellpadding="0" cellspacing="0" border="0" style="flex-shrink:0;"><tr><td style="background:{score_color};border-radius:12px;padding:4px 9px;font-size:12px;font-weight:700;color:#ffffff;text-align:center;white-space:nowrap;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;">{item['score']}</td></tr></table>
-                </div>
+                  </td>
+                  <td style="vertical-align:top;width:28px;text-align:center;">
+                    <table cellpadding="0" cellspacing="0" border="0"><tr><td style="width:28px;height:28px;background:{score_color};border-radius:50%;font-size:12px;font-weight:700;color:#ffffff;text-align:center;vertical-align:middle;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;">{item['score']}</td></tr></table>
+                  </td>
+                </tr></table>
               </td>
             </tr>"""
 
