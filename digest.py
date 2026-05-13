@@ -78,44 +78,12 @@ FEEDS = [
 
 # ── Learning plan context (used in the Claude prompt) ─────────────────────────
 
-LEARNING_PLAN_CONTEXT = """
-The reader is transitioning from Senior People Operations Manager into a Global Head of Data role
-at a software company. Their development plan covers six domains:
-
-1. Data Engineering — pipelines, ELT/ETL, dbt, orchestration (Airflow/Dagster/Prefect),
-   lakehouse architecture, data contracts, CDC, and the modern data stack as a whole.
-
-2. Data Governance — data catalogs, lineage, quality frameworks, observability, RBAC and ABAC,
-   PII classification, data mesh vs centralized models, and governance as an org accountability
-   structure. Increasingly includes AI governance: model cards, lineage for ML pipelines,
-   bias monitoring, and responsible AI frameworks.
-
-3. Analytics & BI — semantic layers, metrics stores, headless BI, self-serve analytics,
-   operational analytics, and product analytics tooling. Calibration more than new learning.
-
-4. Data Science & ML — MLOps lifecycle, feature stores, model deployment and drift monitoring,
-   experimentation and A/B testing rigor, causal inference. Goal is leadership fluency —
-   knowing when results are statistically meaningful, evaluating whether experiments are
-   designed correctly, and having enough intuition to ask good questions of DS/ML teams.
-
-5. AI & Data — how AI is reshaping the data platform landscape and the data leader role.
-   Covers: AI-native data tooling, LLMs applied to data workflows (text-to-SQL, data agents,
-   AI-assisted governance), the organizational implications of embedding AI into data products,
-   and what AI governance means for a data team specifically. This is distinct from ML
-   engineering depth — the focus is strategic and leadership-oriented.
-
-6. Data Leadership & Strategy — data team org design (centralized vs embedded vs hybrid),
-   build vs buy decisions for data tooling, data team roadmapping, making the case for data
-   investment at the executive level, operating as a peer to Heads of Engineering and Product,
-   and defining what the data function uniquely contributes to a software org.
-
-The reader has a strong analytics background and product management experience.
-They are vocabulary-building and developing strategic fluency — not learning to code from scratch.
-Content that helps a data leader understand the landscape, make decisions, and lead teams
-is more valuable than deep technical tutorials.
-Prioritize content that connects AI developments back to data team strategy, tooling decisions,
-or governance responsibilities over pure AI research content.
-"""
+_CONTEXT_FILE = os.path.join(os.path.dirname(__file__), "context.local.txt")
+try:
+    with open(_CONTEXT_FILE) as _f:
+        LEARNING_PLAN_CONTEXT = _f.read().strip()
+except FileNotFoundError:
+    LEARNING_PLAN_CONTEXT = ""
 
 # ── Feed fetching ──────────────────────────────────────────────────────────────
 
